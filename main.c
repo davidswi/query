@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "search_tests.h"
 #include "data_file_utils_tests.h"
+#include "sorted_overlay_tests.h"
 
 int main(){
     int passing_test_count = 0;
@@ -83,7 +84,15 @@ int main(){
     }
 
     if (test_merge_values_into_file_nonoverlapping()){
-        printf("Test test_merge_values_into_file_nonoverlapping passed\n");
+        printf("Test test_merge_values_into_file_nonoverlapping() passed\n");
+        passing_test_count++;
+    }
+    else{
+        failing_test_count++;
+    }
+
+    if (test_sorted_overlay_find_nearest_in_memory()){
+        printf("Test test_sorted_overlay_find_nearest_in_memory() passed\n");
         passing_test_count++;
     }
     else{

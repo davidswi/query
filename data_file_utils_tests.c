@@ -92,6 +92,7 @@ bool test_merge_values_into_file_overlapping_start(){
     uint32_t file_array[] = {4, 7, 10, 13, 18, 20};
     uint32_t merge_array[] = {1, 2, 3};
     uint32_t expected_array[] = {1, 2, 3, 4, 7, 10, 13, 18, 20};
+    range_t merged_range;
 
     if (write_data_file("case1.bin", file_array, 6) < 0){
         printf("ERROR: test_merge_values_into_file_overlapping_start() failed writing data file.\n");
@@ -104,7 +105,7 @@ bool test_merge_values_into_file_overlapping_start(){
         return false;
     }
 
-    int result = merge_values_into_file(data_file, merge_array, 3);
+    int result = merge_values_into_file(data_file, merge_array, 3, &merged_range);
     fclose(data_file);
     if (result < 0){
         printf("ERROR: test_merge_values_into_file_overlapping_start() failed merging values into file.\n");
@@ -116,6 +117,11 @@ bool test_merge_values_into_file_overlapping_start(){
         return false;
     }
 
+    if (merged_range.min_value != 1 || merged_range.max_value != 20){
+        printf("ERROR: test_merge_values_into_file_overlapping_start() failed --- range doesn't match expected.\n");
+        return false;
+    }
+
     return true;
 }
 
@@ -123,6 +129,7 @@ bool test_merge_values_into_file_overlapping_middle(){
     uint32_t file_array[] = {4, 5, 10, 12};
     uint32_t merge_array[] = {7, 8};
     uint32_t expected_array[] = {4, 5, 7, 8, 10, 12};
+    range_t merged_range;
 
     if (write_data_file("case2.bin", file_array, 4) < 0){
         printf("ERROR: test_merge_values_into_file_overlapping_middle() failed creating data file.\n");
@@ -135,7 +142,7 @@ bool test_merge_values_into_file_overlapping_middle(){
         return false;
     }
 
-    int result = merge_values_into_file(data_file, merge_array, 2);
+    int result = merge_values_into_file(data_file, merge_array, 2, &merged_range);
     fclose(data_file);
     if (result < 0){
         printf("ERROR: test_merge_values_into_file_overlapping_middle() failed merging data file.\n");
@@ -147,6 +154,11 @@ bool test_merge_values_into_file_overlapping_middle(){
         return false;
     }
 
+    if (merged_range.min_value != 4 || merged_range.max_value != 12){
+        printf("ERROR: test_merge_values_into_file_overlapping_middle() failed --- range doesn't match expected.\n");
+        return false;
+    }
+
     return true;
 }
 
@@ -154,6 +166,7 @@ bool test_merge_values_into_file_overlapping_end(){
     uint32_t file_array[] = {10, 13, 22, 44, 45, 46};
     uint32_t merge_array[] = {43, 56, 98, 103, 112, 122};
     uint32_t expected_array[] = {10, 13, 22, 43, 44, 45, 46, 56, 98, 103, 112, 122};
+    range_t merged_range;
 
     if (write_data_file("case3.bin", file_array, 6) < 0){
         printf("ERROR: test_merge_values_into_file_overlapping_end() failed creating data file.\n");
@@ -166,7 +179,7 @@ bool test_merge_values_into_file_overlapping_end(){
         return false;
     }
 
-    int result = merge_values_into_file(data_file, merge_array, 6);
+    int result = merge_values_into_file(data_file, merge_array, 6, &merged_range);
     fclose(data_file);
     if (result < 0){
         printf("ERROR: test_merge_values_into_file_overlapping_end() failed merging data file.\n");
@@ -178,6 +191,11 @@ bool test_merge_values_into_file_overlapping_end(){
         return false;
     }
 
+    if (merged_range.min_value != 10 || merged_range.max_value != 122){
+        printf("ERROR: test_merge_values_into_file_overlapping_end() failed --- range doesn't match expected.\n");
+        return false;
+    }
+
     return true;
 }
 
@@ -185,6 +203,7 @@ bool test_merge_values_into_file_nonoverlapping(){
     uint32_t file_array[] = {56, 58, 60, 64};
     uint32_t merge_array[] = {80, 83, 87, 95};
     uint32_t expected_array[] = {56, 58, 60, 64, 80, 83, 87, 95};
+    range_t merged_range;
 
     if (write_data_file("case4.bin", file_array, 4) < 0){
         printf("ERROR: test_merge_values_into_file_nonoverlapping() failed creating data file.\n");
@@ -197,7 +216,7 @@ bool test_merge_values_into_file_nonoverlapping(){
         return false;
     }
 
-    int result = merge_values_into_file(data_file, merge_array, 4);
+    int result = merge_values_into_file(data_file, merge_array, 4, &merged_range);
     fclose(data_file);
     if (result < 0){
         printf("ERROR: test_merge_values_into_file_nonoverlapping() failed merging data file.\n");
@@ -206,6 +225,11 @@ bool test_merge_values_into_file_nonoverlapping(){
 
     if (!compare_written_to_expected("case4.bin", expected_array, 8)){
         printf("ERROR: test_merge_values_into_file_nonoverlapping() -- result doesn't match expected.\n");
+        return false;
+    }
+
+    if (merged_range.min_value != 56 || merged_range.max_value != 95){
+        printf("ERROR: test_merge_values_into_file_nonoverlapping() failed --- range doesn't match expected.\n");
         return false;
     }
 

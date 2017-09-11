@@ -3,13 +3,23 @@
 //
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "sorted_overlay.h"
 #include "data_file_utils.h"
 #include "search.h"
 
 #define ABS(X) (X) < 0 ? -(X) : (X)
 
+#define MAX_CAPACITY                1 << 20
+
+#define UNIT_TESTS
+
+#ifdef UNIT_TESTS
+#define SORTED_OVERLAY_BYTES        64
+#else
 #define SORTED_OVERLAY_BYTES        32768
+#endif // UNIT_TESTS
+
 #define SORTED_OVERLAY_CAPACITY     SORTED_OVERLAY_BYTES / sizeof(uint32_t)
 #define SORTED_OVERLAY_DATA_FILE    "sorted_overlay.dat"
 #define SORTED_DATA_FILE            "sorted.dat"
@@ -37,27 +47,131 @@ typedef struct{
 uint32_t in_memory_overlay[SORTED_OVERLAY_CAPACITY];
 uint16_t in_memory_length;
 
+size_t total_values;
+size_t max_values;
+
 // Pointer to dynamically allocated overlay index array
-overlay_index_t *overlay_index = NULL;
-// Index of current overlay in index array
-uint8_t curr_overlay;
+overlay_index_t *overlay_index;
 // Upper limit on overlay index array
 uint8_t total_overlays;
 
+FILE *sorted_overlay_file = NULL;
+FILE *sorted_file = NULL;
+
 // Helper functions to create fully sorted values file
-void sort_overlay_index();
+int create_sorted_file_index();
 int create_sorted_values_file();
+
+// Sorted file position from overlay index and offset index
+long sorted_file_position(uint8_t overlay_index, uint32_t offset_index);
 
 // Query helper functions
 uint32_t closest_value(uint32_t target, range_t *range);
 uint8_t find_sorted_overlay_index(uint32_t target);
 
-void sort_overlay_index(){
+long sorted_file_position(uint8_t overlay_index, uint32_t offset_index){
+    // Start of overlay in terms of values is zero-based index * SORTED_OVERLAY_CAPACITY
+    long value_index = overlay_index * SORTED_OVERLAY_CAPACITY;
+    // Now add offset
+    value_index += offset_index;
 
+    // Multiply by size of uint32_t to get file position in bytes
+    return value_index * sizeof(uint32_t);
+}
+
+int create_sorted_file_index(){
+    long file_position;
+    uint8_t overlay_ind;
+    range_t overlay_range;
+
+    for (overlay_ind = 0; overlay_ind < total_overlays; overlay_ind++){
+        // Read the minimum value for the current overlay from the sorted file
+        // minimum values occur at 0, SORTED_OVERLAY_CAPACITY * 4, etc.
+        file_position = sorted_file_position(overlay_ind, 0);
+        if (fseek(sorted_file, file_position, SEEK_SET) < 0){
+            return -1;
+        }
+
+        if (fread(&(overlay_range.min_value), sizeof(uint32_t), 1, sorted_file) < 1){
+            return -1;
+        }
+
+        uint32_t last_value_offset;
+        if (overlay_ind == total_overlays - 1){
+            last_value_offset = (total_values % SORTED_OVERLAY_CAPACITY) - 1;
+        }
+        else{
+            last_value_offset = SORTED_OVERLAY_CAPACITY - 1;
+        }
+        file_position = sorted_file_position(overlay_ind, last_value_offset);
+        if (fseek(sorted_file, file_position, SEEK_SET) < 0){
+            return -1;
+        }
+
+        if (fread(&(overlay_range.max_value), sizeof(uint32_t), 1, sorted_file) < 1){
+            return -1;
+        }
+
+        overlay_index[overlay_ind].overlay_num = overlay_ind;
+        overlay_index[overlay_ind].range.min_value = overlay_range.min_value;
+        overlay_index[overlay_ind].range.max_value = overlay_range.max_value;
+    }
+
+    return 0;
 }
 
 int create_sorted_values_file(){
-    return 0;
+    int ret = 0;
+
+    sorted_overlay_file = fopen(SORTED_OVERLAY_DATA_FILE, "rb");
+    if (sorted_overlay_file == NULL){
+        return -1;
+    }
+
+    sorted_file = fopen(SORTED_DATA_FILE, "wb");
+    if (sorted_file == NULL){
+        return  -1;
+    }
+
+    for (uint8_t overlay_ind = 0; overlay_ind < total_overlays; overlay_ind++){
+        size_t overlay_length;
+        range_t merged_range;
+
+        if (overlay_ind == total_overlays - 1){
+            overlay_length = total_values % SORTED_OVERLAY_CAPACITY;
+        }
+        else{
+            overlay_length = SORTED_OVERLAY_CAPACITY;
+        }
+
+        if (fread(in_memory_overlay, sizeof(uint32_t), overlay_length, sorted_overlay_file) != overlay_length){
+            ret = -1;
+            goto done;
+        }
+
+        if (overlay_ind == 0){
+            // Write the first overlay to the sorted values file
+            if (fwrite(in_memory_overlay, sizeof(uint32_t), overlay_length, sorted_file) != overlay_length){
+                ret = -1;
+                goto done;
+            }
+        }
+        else{
+            if (merge_values_into_file(sorted_file, in_memory_overlay, overlay_length, &merged_range) < 0){
+                ret = -1;
+                goto done;
+            }
+        }
+    }
+
+    // Now build the sorted file index
+    ret = create_sorted_file_index();
+
+done:
+    fclose(sorted_file);
+    sorted_file = NULL;
+
+    return ret;
 }
 
 uint32_t closest_value(uint32_t target, range_t *range){
@@ -73,13 +187,143 @@ uint32_t closest_value(uint32_t target, range_t *range){
 }
 
 int sorted_overlay_init(size_t capacity){
+    if (capacity > MAX_CAPACITY){
+        return -1;
+    }
+
+    // Compute the number of overlays in the file
+    if (capacity <= SORTED_OVERLAY_CAPACITY){
+        total_overlays = 1;
+    }
+    else{
+        div_t overlay_div = div(capacity, SORTED_OVERLAY_CAPACITY);
+        total_overlays = overlay_div.quot;
+        if (overlay_div.rem > 0){
+            total_overlays++;
+        }
+
+        // Attempt to allocate the index
+        overlay_index = (overlay_index_t *)malloc(total_overlays * sizeof(overlay_index_t));
+        if (overlay_index == NULL){
+            return -1;
+        }
+
+        // Create the empty sorted overlay file
+        sorted_overlay_file = fopen(SORTED_OVERLAY_DATA_FILE, "wb");
+        if (sorted_overlay_file == NULL){
+            return -1;
+        }
+    }
+
+    in_memory_length = 0;
+    total_values = 0;
+    max_values = capacity;
+
     return 0;
+}
+
+void sorted_overlay_deinit(){
+    if (total_overlays > 1){
+        free(overlay_index);
+    }
 }
 
 int sorted_overlay_add(uint32_t value){
-    return 0;
+    int ret = 0;
+
+    in_memory_overlay[in_memory_length] = value;
+    in_memory_length++;
+    total_values++;
+
+    bool overlay_complete = (in_memory_length == SORTED_OVERLAY_CAPACITY || total_values == max_values);
+
+    if (overlay_complete && total_overlays > 1){
+        ret = sort_and_write_values(sorted_overlay_file, in_memory_overlay, in_memory_length);
+        in_memory_length = 0;
+        if (total_values == max_values){
+            fclose(sorted_overlay_file);
+            ret = create_sorted_values_file();
+        }
+    }
+    else{
+        sort_values_in_memory(in_memory_overlay, in_memory_length);
+    }
+
+    return ret;
+}
+
+uint8_t find_sorted_overlay_index(uint32_t target){
+    // Do a binary search of the overlay index to find the overlay
+    // that contains the closest value to the target
+    uint8_t lower_ind = 0;
+    uint8_t upper_ind = total_overlays - 1;
+    uint8_t midpoint;
+
+    while (upper_ind >= lower_ind){
+        midpoint = lower_ind + ((upper_ind - lower_ind) >> 1);
+        if (target >= overlay_index[midpoint].range.min_value &&
+                target <= overlay_index[midpoint].range.max_value){
+            break;
+        }
+        else{
+            if (target < overlay_index[midpoint].range.min_value){
+                upper_ind = midpoint - 1;
+            }
+            else{
+                lower_ind = midpoint + 1;
+            }
+        }
+    }
+
+    return midpoint;
+}
+
+int data_access_in_memory_overlay(long index, uint32_t *value){
+    if (index >= 0 && index <= in_memory_length){
+        *value = in_memory_overlay[index];
+        return 0;
+    }
+
+    return -1;
 }
 
 uint32_t sorted_overlay_find_nearest(uint32_t value){
-    return 0;
+    uint32_t nearest;
+    long start_ind = 0;
+    long end_ind;
+
+    if (total_overlays > 1){
+        // Find and load the overlay bracketing the value
+        uint8_t containing_overlay_ind = find_sorted_overlay_index(value);
+        long file_pos = sorted_file_position(containing_overlay_ind, 0);
+        if (containing_overlay_ind == total_overlays - 1){
+            in_memory_length = total_values % SORTED_OVERLAY_CAPACITY;
+        }
+        else{
+            in_memory_length = SORTED_OVERLAY_CAPACITY;
+        }
+
+        if (sorted_file == NULL){
+            sorted_file = fopen(SORTED_DATA_FILE, "rb");
+            if (sorted_file == NULL){
+                return UINT32_MAX;
+            }
+        }
+
+
+        if (fread(in_memory_overlay, in_memory_length, sizeof(uint32_t), sorted_file) != in_memory_length){
+            return UINT32_MAX;
+        }
+    }
+
+    end_ind = in_memory_length - 1;
+    if (search(value, &start_ind, &end_ind, data_access_in_memory_overlay)){
+        nearest = value;
+    }
+    else{
+        range_t nearest_in_search = {in_memory_overlay[start_ind], in_memory_overlay[end_ind]};
+        nearest = closest_value(value, &nearest_in_search);
+    }
+
+    return nearest;
 }
