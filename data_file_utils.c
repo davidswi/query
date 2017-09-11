@@ -128,7 +128,7 @@ bool is_overlapping_merge(range_t *file_range, range_t *values_range){
     return (both_inside || right_inside || left_inside || right_outside);
 }
 
-int merge_values_into_file(FILE *file, uint32_t *values, size_t num_values, range_t *merged_range){
+int merge_values_into_file(FILE *file, uint32_t *values, size_t num_values){
     size_t num_file_values = get_num_values_in_file(file);
     if (num_file_values == 0){
         return -1;
@@ -149,20 +149,6 @@ int merge_values_into_file(FILE *file, uint32_t *values, size_t num_values, rang
 
     if (fread(&(file_range.max_value), sizeof(uint32_t), 1, file) < 1){
         return -1;
-    }
-
-    if (value_range.min_value < file_range.min_value){
-        merged_range->min_value = value_range.min_value;
-    }
-    else{
-        merged_range->min_value = file_range.min_value;
-    }
-
-    if (value_range.max_value > file_range.max_value){
-        merged_range->max_value = value_range.max_value;
-    }
-    else{
-        merged_range->max_value = file_range.max_value;
     }
 
     rewind(file);

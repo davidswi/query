@@ -17,6 +17,6 @@ int get_num_values_in_file(FILE *file);
 int sort_and_write_values(FILE *file, uint32_t *values, size_t num_values);
 void sort_values_in_memory(uint32_t *values, size_t num_values);
 long find_file_insertion_point(FILE *file, uint32_t value, long start_ind, long end_ind);
-int merge_values_into_file(FILE *file, uint32_t *values, size_t num_values, range_t *merged_range);
+int merge_values_into_file(FILE *file, uint32_t *values, size_t num_values);
 
 #endif //INTEGER_QUERY_DATA_FILE_UTILS_H

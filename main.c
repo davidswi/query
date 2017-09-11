@@ -99,6 +99,15 @@ int main(){
         failing_test_count++;
     }
 
+    if (test_sorted_overlay_find_nearest_in_file()){
+        printf("Test test_sorted_overlay_find_nearest_in_file() passed\n");
+        passing_test_count++;
+    }
+    else{
+        failing_test_count++;
+    }
+
+
     printf("Tests completed with %d passed, %d failed.\n", passing_test_count,
            failing_test_count);
     return failing_test_count;

@@ -8,8 +8,6 @@
 #include "data_file_utils.h"
 #include "search.h"
 
-#define ABS(X) (X) < 0 ? -(X) : (X)
-
 #define MAX_CAPACITY                1 << 20
 
 #define UNIT_TESTS
@@ -23,11 +21,6 @@
 #define SORTED_OVERLAY_CAPACITY     SORTED_OVERLAY_BYTES / sizeof(uint32_t)
 #define SORTED_OVERLAY_DATA_FILE    "sorted_overlay.dat"
 #define SORTED_DATA_FILE            "sorted.dat"
-
-typedef struct{
-    uint8_t overlay_num;
-    range_t range;
-} overlay_index_t;
 
 // The sorted_overlay file format consists of one or more persisted overlays containing up
 // to SORTED_OVERLAY_CAPACITY integers in sorted order. The sorted_overlay module accesses
@@ -50,9 +43,9 @@ uint16_t in_memory_length;
 size_t total_values;
 size_t max_values;
 
-// Pointer to dynamically allocated overlay index array
-overlay_index_t *overlay_index;
-// Upper limit on overlay index array
+// Pointer to dynamically allocated overlay range LUT
+range_t *overlay_lookup_table;
+// Upper limit on overlay LUT
 uint8_t total_overlays;
 
 FILE *sorted_overlay_file = NULL;
@@ -61,9 +54,6 @@ FILE *sorted_file = NULL;
 // Helper functions to create fully sorted values file
 int create_sorted_file_index();
 int create_sorted_values_file();
-
-// Sorted file position from overlay index and offset index
-long sorted_file_position(uint8_t overlay_index, uint32_t offset_index);
 
 // Query helper functions
 uint32_t closest_value(uint32_t target, range_t *range);
@@ -112,9 +102,8 @@ int create_sorted_file_index(){
             return -1;
         }
 
-        overlay_index[overlay_ind].overlay_num = overlay_ind;
-        overlay_index[overlay_ind].range.min_value = overlay_range.min_value;
-        overlay_index[overlay_ind].range.max_value = overlay_range.max_value;
+        overlay_lookup_table[overlay_ind].min_value = overlay_range.min_value;
+        overlay_lookup_table[overlay_ind].max_value = overlay_range.max_value;
     }
 
     return 0;
@@ -135,7 +124,6 @@ int create_sorted_values_file(){
 
     for (uint8_t overlay_ind = 0; overlay_ind < total_overlays; overlay_ind++){
         size_t overlay_length;
-        range_t merged_range;
 
         if (overlay_ind == total_overlays - 1){
             overlay_length = total_values % SORTED_OVERLAY_CAPACITY;
@@ -157,7 +145,7 @@ int create_sorted_values_file(){
             }
         }
         else{
-            if (merge_values_into_file(sorted_file, in_memory_overlay, overlay_length, &merged_range) < 0){
+            if (merge_values_into_file(sorted_file, in_memory_overlay, overlay_length) < 0){
                 ret = -1;
                 goto done;
             }
@@ -175,8 +163,8 @@ done:
 }
 
 uint32_t closest_value(uint32_t target, range_t *range){
-    int dist_to_lower = ABS(target - range->min_value);
-    int dist_to_upper = ABS(target - range->max_value);
+    int dist_to_lower = abs(target - range->min_value);
+    int dist_to_upper = abs(target - range->max_value);
 
     if (dist_to_lower <= dist_to_upper){
         return range->min_value;
@@ -202,9 +190,9 @@ int sorted_overlay_init(size_t capacity){
             total_overlays++;
         }
 
-        // Attempt to allocate the index
-        overlay_index = (overlay_index_t *)malloc(total_overlays * sizeof(overlay_index_t));
-        if (overlay_index == NULL){
+        // Attempt to allocate the LUT
+        overlay_lookup_table = (range_t *)malloc(total_overlays * sizeof(range_t));
+        if (overlay_lookup_table == NULL){
             return -1;
         }
 
@@ -224,7 +212,7 @@ int sorted_overlay_init(size_t capacity){
 
 void sorted_overlay_deinit(){
     if (total_overlays > 1){
-        free(overlay_index);
+        free(overlay_lookup_table);
     }
 }
 
@@ -261,12 +249,12 @@ uint8_t find_sorted_overlay_index(uint32_t target){
 
     while (upper_ind >= lower_ind){
         midpoint = lower_ind + ((upper_ind - lower_ind) >> 1);
-        if (target >= overlay_index[midpoint].range.min_value &&
-                target <= overlay_index[midpoint].range.max_value){
+        if (target >= overlay_lookup_table[midpoint].min_value &&
+                target <= overlay_lookup_table[midpoint].max_value){
             break;
         }
         else{
-            if (target < overlay_index[midpoint].range.min_value){
+            if (target < overlay_lookup_table[midpoint].min_value){
                 upper_ind = midpoint - 1;
             }
             else{
@@ -285,6 +273,10 @@ int data_access_in_memory_overlay(long index, uint32_t *value){
     }
 
     return -1;
+}
+
+bool is_valid_index(long index){
+    return (index >= 0 && index < in_memory_length);
 }
 
 uint32_t sorted_overlay_find_nearest(uint32_t value){
@@ -321,8 +313,18 @@ uint32_t sorted_overlay_find_nearest(uint32_t value){
         nearest = value;
     }
     else{
-        range_t nearest_in_search = {in_memory_overlay[start_ind], in_memory_overlay[end_ind]};
-        nearest = closest_value(value, &nearest_in_search);
+        if (is_valid_index(start_ind) && is_valid_index(end_ind)){
+            range_t nearest_in_search = {in_memory_overlay[end_ind], in_memory_overlay[start_ind]};
+            nearest = closest_value(value, &nearest_in_search);
+        }
+        else{
+            if (is_valid_index(start_ind)){
+                nearest = in_memory_overlay[start_ind];
+            }
+            else{
+                nearest = in_memory_overlay[end_ind];
+            }
+        }
     }
 
     return nearest;
