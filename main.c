@@ -1,4 +1,4 @@
-#define UNIT_TESTS
+// #define UNIT_TESTS
 
 #ifdef UNIT_TESTS
 
@@ -145,16 +145,19 @@ int read_data_file(FILE *data_file){
         ret = -1;
     }
 
-    while (ret == 0 && !feof(data_file)){
+    long num_read = 0;
+    while (ret == 0 && num_read < num_values){
         uint32_t big_endian_value;
-        size_t bytes_read = fread(&big_endian_value, sizeof(uint32_t), 1, data_file);
-        if (bytes_read != sizeof(uint32_t)){
+        if (fread(&big_endian_value, sizeof(uint32_t), 1, data_file) < 1){
             ret = -1;
         }
         else{
             uint32_t host_format_value = ntohl(big_endian_value);
             if (sorted_overlay_add(host_format_value) < 0){
                 ret -1;
+            }
+            else{
+                num_read++;
             }
         }
     }
