@@ -38,7 +38,7 @@
 // finding the nearest value by binary search of the in-memory overlay.
 
 uint32_t in_memory_overlay[SORTED_OVERLAY_CAPACITY];
-uint16_t in_memory_length;
+size_t in_memory_length;
 
 size_t total_values;
 size_t max_values;
@@ -331,32 +331,53 @@ bool is_valid_index(long index){
 }
 
 uint32_t sorted_overlay_find_nearest(uint32_t value){
-    uint32_t nearest;
+    uint32_t nearest = UINT32_MAX;
     long start_ind = 0;
     long end_ind;
 
     if (total_overlays > 1){
+        // Handle the boundaries at/outside the ranges of the LUT entries
+        if (value <= overlay_lookup_table[0].min_value){
+            return overlay_lookup_table[0].min_value;
+        }
+        else{
+            if (value >= overlay_lookup_table[total_overlays - 1].max_value){
+                return overlay_lookup_table[total_overlays - 1].max_value;
+            }
+        }
+
         // Find and load the overlay bracketing the value
         uint8_t containing_overlay_ind = find_sorted_overlay_index(value);
         long file_pos = sorted_file_position(containing_overlay_ind, 0);
         if (containing_overlay_ind == total_overlays - 1){
-            in_memory_length = total_values % SORTED_OVERLAY_CAPACITY;
+            div_t overlay_div = div(total_values, SORTED_OVERLAY_CAPACITY);
+            if (overlay_div.rem == 0){
+                in_memory_length = SORTED_OVERLAY_CAPACITY;
+            }
+            else{
+                in_memory_length = overlay_div.rem;
+            }
         }
         else{
             in_memory_length = SORTED_OVERLAY_CAPACITY;
         }
 
+        sorted_file = fopen(SORTED_DATA_FILE, "rb");
         if (sorted_file == NULL){
-            sorted_file = fopen(SORTED_DATA_FILE, "rb");
-            if (sorted_file == NULL){
-                return UINT32_MAX;
-            }
-        }
-
-
-        if (fread(in_memory_overlay, in_memory_length, sizeof(uint32_t), sorted_file) != in_memory_length){
             return UINT32_MAX;
         }
+
+        if (file_pos > 0 && fseek(sorted_file, file_pos, SEEK_SET) < 0){
+            fclose(sorted_file);
+            return UINT32_MAX;
+        }
+
+        if (fread(in_memory_overlay, sizeof(uint32_t), in_memory_length, sorted_file) != in_memory_length){
+            fclose(sorted_file);
+            return UINT32_MAX;
+        }
+
+        fclose(sorted_file);
     }
 
     end_ind = in_memory_length - 1;
