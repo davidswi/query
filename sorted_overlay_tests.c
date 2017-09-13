@@ -82,6 +82,8 @@ bool test_sorted_overlay_find_nearest_in_file(){
         }
     }
 
+    sorted_overlay_dump();
+
     for (int j = 0; j < 5; j++){
         uint32_t nearest = sorted_overlay_find_nearest(test_cases[j]);
         printf("Nearest for %u is %u\n", test_cases[j], nearest);

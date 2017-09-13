@@ -69,6 +69,34 @@ long sorted_file_position(uint8_t overlay_index, uint32_t offset_index){
     return value_index * sizeof(uint32_t);
 }
 
+void sorted_overlay_dump_file(char *filename){
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL){
+        printf("ERROR: Failed to open %s\n", filename);
+    }
+
+    for (int i = 0; i < total_values; i++){
+        uint32_t value;
+        if (fread(&value, sizeof(uint32_t), 1, file) < 1){
+            printf("ERROR: Failed to read value from file!\n");
+            break;
+        }
+        printf("value (%d) = %u\n", i, value);
+    }
+
+    fclose(file);
+}
+
+void sorted_overlay_dump_lookup_table(){
+
+}
+
+void sorted_overlay_dump(){
+    sorted_overlay_dump_file(SORTED_OVERLAY_DATA_FILE);
+    sorted_overlay_dump_file(SORTED_DATA_FILE);
+    sorted_overlay_dump_lookup_table();
+}
+
 int create_sorted_file_index(){
     long file_position;
     uint8_t overlay_ind;
@@ -145,6 +173,11 @@ int create_sorted_values_file(){
             }
         }
         else{
+            sorted_file = freopen(SORTED_DATA_FILE, "rb+", sorted_file);
+            if (sorted_file == NULL){
+                return -1;
+            }
+
             if (merge_values_into_file(sorted_file, in_memory_overlay, overlay_length) < 0){
                 ret = -1;
                 goto done;

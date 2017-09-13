@@ -12,6 +12,7 @@ bool test_find_file_insertion_point();
 bool test_merge_values_into_file_overlapping_start();
 bool test_merge_values_into_file_overlapping_middle();
 bool test_merge_values_into_file_overlapping_end();
+bool test_merge_values_into_file_large();
 bool test_merge_values_into_file_nonoverlapping();
 
 #endif //INTEGER_QUERY_DATA_FILE_UTILS_TESTS_H

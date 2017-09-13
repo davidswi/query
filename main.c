@@ -83,6 +83,14 @@ int main(){
         failing_test_count++;
     }
 
+    if (test_merge_values_into_file_large()){
+        printf("Test test_merge_values_into_file_large() passed\n");
+        passing_test_count++;
+    }
+    else{
+        failing_test_count++;
+    }
+
     if (test_merge_values_into_file_nonoverlapping()){
         printf("Test test_merge_values_into_file_nonoverlapping() passed\n");
         passing_test_count++;

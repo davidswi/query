@@ -16,12 +16,12 @@ bool compare_written_to_expected(char *filename, uint32_t *expected, size_t leng
     if (data_file != NULL) {
         int i;
         for (i = 0; i < length; i++){
-            uint32_t next_value;
-            if (fread(&next_value, sizeof(uint32_t), 1, data_file) != 1){
+            uint32_t next_;
+            if (fread(&next_, sizeof(uint32_t), 1, data_file) != 1){
                 break;
             }
-            printf("compare_written_to_expected(): read %u, expecting %u\n", next_value, expected[i]);
-            if (next_value != expected[i]){
+            printf("compare_written_to_expected(): read %u, expecting %u\n", next_, expected[i]);
+            if (next_ != expected[i]){
                 break;
             }
         }
@@ -107,7 +107,7 @@ bool test_merge_values_into_file_overlapping_start(){
     int result = merge_values_into_file(data_file, merge_array, 3);
     fclose(data_file);
     if (result < 0){
-        printf("ERROR: test_merge_values_into_file_overlapping_start() failed merging values into file.\n");
+        printf("ERROR: test_merge_values_into_file_overlapping_start() failed merging s into file.\n");
         return false;
     }
 
@@ -181,17 +181,113 @@ bool test_merge_values_into_file_overlapping_end(){
     return true;
 }
 
+bool test_merge_values_into_file_large(){
+    uint32_t file_array[] = {2251,
+    4209,
+    4554,
+    7580,
+    8276,
+    15323,
+    26262,
+    28318,
+    42548,
+    44230,
+    45563,
+    49613,
+    50940,
+    53749,
+    59794,
+    64724};
+    uint32_t merge_array[] = {1309,
+     3097,
+     3750,
+     7031,
+     8545,
+     9876,
+     13289,
+     16804,
+     18504,
+     19529,
+     23769,
+     29949,
+     34108,
+     46628,
+     49221,
+     56260
+    };
+    uint32_t expected_array[] = {
+            1309,
+            2251,
+            3097,
+            3750,
+            4209,
+            4554,
+            7031,
+            7580,
+            8276,
+            8545,
+            9876,
+            13289,
+            15323,
+            16804,
+            18504,
+            19529,
+            23769,
+            26262,
+            28318,
+            29949,
+            34108,
+            42548,
+            44230,
+            45563,
+            46628,
+            49221,
+            49613,
+            50940,
+            53749,
+            56260,
+            59794,
+            64724
+    };
+
+    if (write_data_file("case4.bin", file_array, 16) < 0){
+        printf("ERROR: test_merge_values_into_file_large() failed creating data file.\n");
+        return false;
+    }
+
+    FILE *data_file = fopen("case4.bin", "rb+");
+    if (data_file == NULL){
+        printf("ERROR: test_merge_values_into_file_large() failed opening data file.\n");
+        return false;
+    }
+
+    int result = merge_values_into_file(data_file, merge_array, 16);
+    fclose(data_file);
+    if (result < 0){
+        printf("ERROR: test_merge_values_into_file_large() failed merging data file.\n");
+        return false;
+    }
+
+    if (!compare_written_to_expected("case4.bin", expected_array, 32)){
+        printf("ERROR: test_merge_values_into_file_large() failed -- result doesn't match expected.\n");
+        return false;
+    }
+
+    return true;
+}
+
+
 bool test_merge_values_into_file_nonoverlapping(){
     uint32_t file_array[] = {56, 58, 60, 64};
     uint32_t merge_array[] = {80, 83, 87, 95};
     uint32_t expected_array[] = {56, 58, 60, 64, 80, 83, 87, 95};
 
-    if (write_data_file("case4.bin", file_array, 4) < 0){
+    if (write_data_file("case5.bin", file_array, 4) < 0){
         printf("ERROR: test_merge_values_into_file_nonoverlapping() failed creating data file.\n");
         return false;
     }
 
-    FILE *data_file = fopen("case4.bin", "rb+");
+    FILE *data_file = fopen("case5.bin", "rb+");
     if (data_file == NULL){
         printf("ERROR: test_merge_values_into_file_nonoverlapping() failed opening data file.\n");
         return false;
@@ -204,7 +300,7 @@ bool test_merge_values_into_file_nonoverlapping(){
         return false;
     }
 
-    if (!compare_written_to_expected("case4.bin", expected_array, 8)){
+    if (!compare_written_to_expected("case5.bin", expected_array, 8)){
         printf("ERROR: test_merge_values_into_file_nonoverlapping() -- result doesn't match expected.\n");
         return false;
     }
