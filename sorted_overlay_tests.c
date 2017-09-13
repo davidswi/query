@@ -69,6 +69,7 @@ bool test_sorted_overlay_find_nearest_in_file(){
             7031,
             1309};
     uint32_t test_cases[] = {16384, 1280, 10000, 60000, 25867};
+    uint32_t expected_results[] = {16804, 1309, 9876, 59794, 26262};
 
     if (sorted_overlay_init(32) < 0){
         printf("ERROR: test_sorted_overlay_find_nearest_in_file() failed initializing.\n");
@@ -82,12 +83,14 @@ bool test_sorted_overlay_find_nearest_in_file(){
         }
     }
 
-    sorted_overlay_dump();
-
     for (int j = 0; j < 5; j++){
         uint32_t nearest = sorted_overlay_find_nearest(test_cases[j]);
-        printf("Nearest for %u is %u\n", test_cases[j], nearest);
+        if (nearest != expected_results[j]) {
+            printf("ERROR: test_sorted_overlay_find_nearest_in_file() failed -- expected %u, got %u\n",
+                   expected_results[j], nearest);
+            return false;
+        }
     }
 
-    return false;
+    return true;
 }
