@@ -196,39 +196,22 @@ int merge_values_into_file(FILE *file, uint32_t *values, size_t num_values){
         int copy_ind = 0;
 
         while (insert_index < num_file_values){
-            int num_overlapping = num_file_values - insert_index;
-            int num_to_insert = MIN(num_overlapping, num_values);
-            int save_ind = 0;
+            uint32_t value_copy = values[copy_ind];
+            uint32_t overwritten_value;
 
-            while (save_ind < num_to_insert){
-                uint32_t value_copy = values[copy_ind];
-                uint32_t overwritten_value;
+            if (insert_value_in_file(file, insert_index++, value_copy, &overwritten_value) < 0){
+                return -1;
+            }
 
-                if (insert_value_in_file(file, insert_index++, value_copy, &overwritten_value) < 0){
-                    return -1;
-                }
-
-                if (overwritten_value == UINT32_MAX){
-                    // We wrote to end of file, don't bother saving the overwritten value
-                    copy_ind++;
-                    save_ind++;
-                }
-                else {
-                    values[save_ind] = overwritten_value;
-                    bool needs_sort = (save_ind <= num_values - 2 && values[save_ind] > values[save_ind + 1]);
-                    if (!needs_sort && values[save_ind] >= value_copy){
-                        copy_ind++;
-                        save_ind++;
-                    }
-                    else{
-                        if (needs_sort){
-                            sort_values_in_memory(values, num_values);
-                            printf("Not advancing index -- resorting merge array\n");
-                        }
-                        else{
-                            printf("Not advancing index -- %u < %u\n", values[save_ind], value_copy);
-                        }
-                    }
+            if (overwritten_value == UINT32_MAX){
+                // We wrote to end of file, don't bother saving the overwritten value
+                copy_ind++;
+            }
+            else {
+                values[copy_ind] = overwritten_value;
+                if (copy_ind <= num_values - 2 && values[copy_ind] > values[copy_ind + 1]) {
+                    sort_values_in_memory(values, num_values);
+                    printf("Resorting merge array %u > %u\n", values[copy_ind], values[copy_ind + 1]);
                 }
             }
         }
@@ -239,7 +222,7 @@ int merge_values_into_file(FILE *file, uint32_t *values, size_t num_values){
                 return -1;
             }
             printf("merge_values_into_file(): Wrote %u to end of file\n", values[copy_ind]);
-            copy_ind = (copy_ind + 1) % num_values;
+            copy_ind++;
             insert_index++;
         }
     }
