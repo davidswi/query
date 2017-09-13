@@ -45,6 +45,7 @@ size_t max_values;
 
 // Pointer to dynamically allocated overlay range LUT
 range_t *overlay_lookup_table;
+uint8_t curr_overlay_ind;
 // Upper limit on overlay LUT
 uint8_t total_overlays;
 
@@ -240,6 +241,7 @@ int sorted_overlay_init(size_t capacity){
         if (overlay_div.rem > 0){
             total_overlays++;
         }
+        curr_overlay_ind = 0;
 
         // Attempt to allocate the LUT
         overlay_lookup_table = (range_t *)malloc(total_overlays * sizeof(range_t));
@@ -278,10 +280,12 @@ int sorted_overlay_add(uint32_t value){
 
     if (overlay_complete && total_overlays > 1){
         ret = sort_and_write_values(sorted_overlay_file, in_memory_overlay, in_memory_length);
+        overlay_lookup_table[curr_overlay_ind].min_value = in_memory_overlay[0];
+        overlay_lookup_table[curr_overlay_ind].max_value = in_memory_overlay[in_memory_length - 1];
+        curr_overlay_ind++;
         in_memory_length = 0;
         if (total_values == max_values){
             fclose(sorted_overlay_file);
-            ret = create_sorted_values_file();
         }
     }
     else{
@@ -330,26 +334,12 @@ bool is_valid_index(long index){
     return (index >= 0 && index < in_memory_length);
 }
 
-uint32_t sorted_overlay_find_nearest(uint32_t value){
-    uint32_t nearest = UINT32_MAX;
-    long start_ind = 0;
-    long end_ind;
+uint32_t find_nearest_in_overlay(uint8_t overlay_ind, uint32_t value){
+    long file_pos = sorted_file_position(overlay_ind, 0);
+    uint32_t nearest;
 
-    if (total_overlays > 1){
-        // Handle the boundaries at/outside the ranges of the LUT entries
-        if (value <= overlay_lookup_table[0].min_value){
-            return overlay_lookup_table[0].min_value;
-        }
-        else{
-            if (value >= overlay_lookup_table[total_overlays - 1].max_value){
-                return overlay_lookup_table[total_overlays - 1].max_value;
-            }
-        }
-
-        // Find and load the overlay bracketing the value
-        uint8_t containing_overlay_ind = find_sorted_overlay_index(value);
-        long file_pos = sorted_file_position(containing_overlay_ind, 0);
-        if (containing_overlay_ind == total_overlays - 1){
+    if (overlay_ind != curr_overlay_ind){
+        if (overlay_ind == total_overlays - 1){
             div_t overlay_div = div(total_values, SORTED_OVERLAY_CAPACITY);
             if (overlay_div.rem == 0){
                 in_memory_length = SORTED_OVERLAY_CAPACITY;
@@ -362,39 +352,89 @@ uint32_t sorted_overlay_find_nearest(uint32_t value){
             in_memory_length = SORTED_OVERLAY_CAPACITY;
         }
 
-        sorted_file = fopen(SORTED_DATA_FILE, "rb");
-        if (sorted_file == NULL){
+        sorted_overlay_file = fopen(SORTED_OVERLAY_DATA_FILE, "rb");
+        if (sorted_overlay_file == NULL){
             return UINT32_MAX;
         }
 
-        if (file_pos > 0 && fseek(sorted_file, file_pos, SEEK_SET) < 0){
-            fclose(sorted_file);
+        if (file_pos > 0 && fseek(sorted_overlay_file, file_pos, SEEK_SET) < 0){
+            fclose(sorted_overlay_file);
             return UINT32_MAX;
         }
 
-        if (fread(in_memory_overlay, sizeof(uint32_t), in_memory_length, sorted_file) != in_memory_length){
-            fclose(sorted_file);
+        if (fread(in_memory_overlay, sizeof(uint32_t), in_memory_length, sorted_overlay_file) != in_memory_length){
+            fclose(sorted_overlay_file);
             return UINT32_MAX;
         }
 
-        fclose(sorted_file);
+        fclose(sorted_overlay_file);
+        curr_overlay_ind = overlay_ind;
     }
 
-    end_ind = in_memory_length - 1;
+    long start_ind = 0;
+    long  end_ind = in_memory_length - 1;
     if (search(value, &start_ind, &end_ind, data_access_in_memory_overlay)){
         nearest = value;
     }
-    else{
-        if (is_valid_index(start_ind) && is_valid_index(end_ind)){
+    else {
+        if (is_valid_index(start_ind) && is_valid_index(end_ind)) {
             range_t nearest_in_search = {in_memory_overlay[end_ind], in_memory_overlay[start_ind]};
             nearest = closest_value(value, &nearest_in_search);
+        } else {
+            if (is_valid_index(start_ind)) {
+                nearest = overlay_lookup_table[overlay_ind].min_value;
+            } else {
+                nearest = overlay_lookup_table[overlay_ind].max_value;
+            }
         }
-        else{
-            if (is_valid_index(start_ind)){
-                nearest = in_memory_overlay[start_ind];
+    }
+
+    return nearest;
+}
+
+uint32_t sorted_overlay_find_nearest(uint32_t value){
+    uint32_t nearest = UINT32_MAX;
+
+    if (total_overlays > 1){
+        for (uint8_t overlay_ind = 0; overlay_ind < total_overlays; overlay_ind++){
+            if (value == overlay_lookup_table[overlay_ind].min_value){
+                return overlay_lookup_table[overlay_ind].min_value;
             }
             else{
-                nearest = in_memory_overlay[end_ind];
+                if (value == overlay_lookup_table[overlay_ind].max_value){
+                    return overlay_lookup_table[overlay_ind].max_value;
+                }
+                else{
+                    if (value > overlay_lookup_table[overlay_ind].min_value &&
+                            value < overlay_lookup_table[overlay_ind].max_value){
+                        uint32_t nearest_in_overlay = find_nearest_in_overlay(overlay_ind, value);
+                        if (nearest_in_overlay < nearest){
+                            nearest = nearest_in_overlay;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    else{
+        long start_ind = 0;
+        long end_ind = in_memory_length - 1;
+
+        if (search(value, &start_ind, &end_ind, data_access_in_memory_overlay)){
+            nearest = value;
+        }
+        else{
+            if (is_valid_index(start_ind) && is_valid_index(end_ind)){
+                range_t nearest_in_search = {in_memory_overlay[end_ind], in_memory_overlay[start_ind]};
+                nearest = closest_value(value, &nearest_in_search);
+            }
+            else{
+                if (is_valid_index(start_ind)){
+                    nearest = in_memory_overlay[start_ind];
+                }
+                else{
+                    nearest = in_memory_overlay[end_ind];
+                }
             }
         }
     }
