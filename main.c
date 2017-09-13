@@ -162,14 +162,12 @@ int read_data_file(FILE *data_file){
         }
     }
 
-    fclose(data_file);
-
     return ret;
 }
 
 int main(int argc, char **argv){
-    if (argc != 2){
-        printf("Usage: query <filename>, where filename is a file containing values in the expected format.\n");
+    if (argc < 2){
+        printf("Usage: query binfile, where binfile is in the readme format.\n");
         return -1;
     }
 
@@ -183,25 +181,26 @@ int main(int argc, char **argv){
         printf("ERROR: Failed to read data file. Check file integrity.\n");
         return -1;
     }
+    fclose(data_file);
 
     printf("Reading number of test cases...\n");
-    char *test_case_count = NULL;
-    if (getline(&test_case_count, NULL, stdin) == -1){
-        printf("ERROR: Test case count not specified.\n");
-        return -1;
-    }
+    char next_line[32];
+    size_t bufsize = 32;
+    fgets(next_line, bufsize, stdin);
 
-    int total_tests = atoi(test_case_count);
+    int total_tests = atoi(next_line);
     if (total_tests < 0 || total_tests > MAX_TEST_CASES){
         printf("ERROR: %d is an invalid test case count (1-10000 allowed)\n", total_tests);
         return -1;
     }
 
-    char *query_integer;
-    while (test_case_count > 0 && getline(&query_integer, NULL, stdin) != -1){
-        uint32_t target_value = atoi(query_integer);
+    while (total_tests > 0){
+        bufsize = 32;
+        fgets(next_line, bufsize, stdin);
+        uint32_t target_value = atoi(next_line);
         uint32_t closest_value = sorted_overlay_find_nearest(target_value);
         printf("%d\n", closest_value);
+        total_tests--;
     }
 
     return 0;

@@ -10,7 +10,7 @@
 
 #define MAX_CAPACITY                1 << 20
 
-#define UNIT_TESTS
+// #define UNIT_TESTS
 
 #ifdef UNIT_TESTS
 #define SORTED_OVERLAY_BYTES        64
