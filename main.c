@@ -207,6 +207,8 @@ int main(int argc, char **argv){
         total_tests--;
     }
 
+    sorted_overlay_deinit();
+
     return 0;
 }
 #endif // UNIT_TESTS
