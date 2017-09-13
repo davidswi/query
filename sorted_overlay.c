@@ -152,9 +152,15 @@ int create_sorted_values_file(){
 
     for (uint8_t overlay_ind = 0; overlay_ind < total_overlays; overlay_ind++){
         size_t overlay_length;
+        div_t overlay_div = div(total_values, SORTED_OVERLAY_CAPACITY);
 
-        if (overlay_ind == total_overlays - 1){
-            overlay_length = total_values % SORTED_OVERLAY_CAPACITY;
+        if (overlay_ind < total_overlays - 1){
+            if (overlay_div.rem == 0) {
+                overlay_length = SORTED_OVERLAY_CAPACITY;
+            }
+            else{
+                overlay_length = overlay_div.rem;
+            }
         }
         else{
             overlay_length = SORTED_OVERLAY_CAPACITY;
