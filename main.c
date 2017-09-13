@@ -147,7 +147,6 @@ int read_data_file(FILE *data_file){
 
     long num_read = 0;
     while (ret == 0 && num_read < num_values){
-        printf("Adding %u of %u\n", num_read, num_values);
         uint32_t big_endian_value;
         if (fread(&big_endian_value, sizeof(uint32_t), 1, data_file) < 1){
             ret = -1;
@@ -184,7 +183,9 @@ int main(int argc, char **argv){
     }
     fclose(data_file);
 
+#ifdef LOG_DEBUG
     sorted_overlay_dump();
+#endif // LOG_DEBUG
 
     printf("Reading number of test cases...\n");
     char next_line[32];

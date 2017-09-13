@@ -122,31 +122,14 @@ int insert_value_in_file(FILE *file,
         return -1;
     }
 
+#ifdef LOG_DEBUG
     if (value_at_pos != UINT32_MAX) {
         printf("insert_value_in_file(): Wrote %u and saved %u\n", value, value_at_pos);
     } else {
         printf("insert_value_in_file(): Wrote %u\n", value);
     }
+#endif
 
-    return 0;
-}
-
-int lookahead_next_value(FILE *file, uint32_t *next_value){
-    uint32_t value_at_pos;
-
-    if (fread(&value_at_pos, sizeof(uint32_t), 1, file) < 1) {
-        if (feof(file)) {
-            value_at_pos = UINT32_MAX;
-        } else {
-            return -1;
-        }
-    }
-
-    if (fseek(file, -sizeof(uint32_t), SEEK_CUR) < 0){
-        return -1;
-    }
-
-    *next_value = value_at_pos;
     return 0;
 }
 
@@ -211,7 +194,9 @@ int merge_values_into_file(FILE *file, uint32_t *values, size_t num_values){
                 values[copy_ind] = overwritten_value;
                 if (copy_ind <= num_values - 2 && values[copy_ind] > values[copy_ind + 1]) {
                     sort_values_in_memory(values, num_values);
+#ifdef LOG_DEBUG
                     printf("Resorting merge array %u > %u\n", values[copy_ind], values[copy_ind + 1]);
+#endif
                 }
             }
         }
@@ -221,7 +206,9 @@ int merge_values_into_file(FILE *file, uint32_t *values, size_t num_values){
             if (fwrite(values + copy_ind, sizeof(uint32_t), 1, file) < 1){
                 return -1;
             }
+#ifdef LOG_DEBUG
             printf("merge_values_into_file(): Wrote %u to end of file\n", values[copy_ind]);
+#endif
             copy_ind++;
             insert_index++;
         }

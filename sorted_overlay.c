@@ -98,8 +98,8 @@ void sorted_overlay_dump_lookup_table(){
 }
 
 void sorted_overlay_dump(){
-    sorted_overlay_dump_file(SORTED_OVERLAY_DATA_FILE);
-    sorted_overlay_dump_file(SORTED_DATA_FILE);
+//    sorted_overlay_dump_file(SORTED_OVERLAY_DATA_FILE);
+//    sorted_overlay_dump_file(SORTED_DATA_FILE);
     sorted_overlay_dump_lookup_table();
 }
 
@@ -166,7 +166,7 @@ int create_sorted_values_file(){
         size_t overlay_length;
         div_t overlay_div = div(total_values, SORTED_OVERLAY_CAPACITY);
 
-        if (overlay_ind < total_overlays - 1){
+        if (overlay_ind == total_overlays - 1){
             if (overlay_div.rem == 0) {
                 overlay_length = SORTED_OVERLAY_CAPACITY;
             }
