@@ -75,6 +75,8 @@ void sorted_overlay_dump_file(char *filename){
         printf("ERROR: Failed to open %s\n", filename);
     }
 
+    printf("Dumping file: %s\n", filename);
+
     for (int i = 0; i < total_values; i++){
         uint32_t value;
         if (fread(&value, sizeof(uint32_t), 1, file) < 1){
@@ -88,7 +90,11 @@ void sorted_overlay_dump_file(char *filename){
 }
 
 void sorted_overlay_dump_lookup_table(){
-
+    printf("Dumping overlay LUT...\n");
+    for (uint8_t ind = 0; ind < total_overlays; ind++){
+        printf("Index: %d, min = %u, max = %u\n",
+               ind, overlay_lookup_table[ind].min_value, overlay_lookup_table[ind].max_value);
+    }
 }
 
 void sorted_overlay_dump(){
@@ -116,7 +122,13 @@ int create_sorted_file_index(){
 
         uint32_t last_value_offset;
         if (overlay_ind == total_overlays - 1){
-            last_value_offset = (total_values % SORTED_OVERLAY_CAPACITY) - 1;
+            div_t sorted_overlay_div = div(total_values, SORTED_OVERLAY_CAPACITY);
+            if (sorted_overlay_div.rem == 0){
+                last_value_offset = SORTED_OVERLAY_CAPACITY - 1;
+            }
+            else{
+               last_value_offset = sorted_overlay_div.rem;
+            }
         }
         else{
             last_value_offset = SORTED_OVERLAY_CAPACITY - 1;
